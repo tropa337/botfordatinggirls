@@ -2,7 +2,7 @@ import sqlite3
 
 DB_NAME = "bot.db"
 
-# --- Ініціалізація БД ---
+#БД
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -12,6 +12,11 @@ def init_db():
         user_id INTEGER PRIMARY KEY,
         name TEXT,
         age INTEGER,
+        gender TEXT,
+        looking_for TEXT,
+        faculty TEXT,
+        specialty TEXT,
+        accessibility INTEGER,
         course TEXT,
         bio TEXT,
         photo_id TEXT,
@@ -31,41 +36,56 @@ def init_db():
     conn.commit()
     conn.close()
 
-# --- Функції роботи з БД ---
-def add_profile(user_id, name, age, course, bio, photo_id):
+
+# Добавить профиль
+def add_profile(user_id, name, age, gender, looking_for, faculty, specialty, accessibility, course, bio, photo_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute(
-        "INSERT OR REPLACE INTO profiles (user_id, name, age, course, bio, photo_id, active) VALUES (?, ?, ?, ?, ?, ?, 1)",
-        (user_id, name, age, course, bio, photo_id)
-    )
+    cursor.execute("""
+        INSERT OR REPLACE INTO profiles 
+        (user_id, name, age, gender, looking_for, faculty, specialty, accessibility, course, bio, photo_id, active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    """, (user_id, name, age, gender, looking_for, faculty, specialty, accessibility, course, bio, photo_id))
     conn.commit()
     conn.close()
 
+
+# Получить профиль
 def get_profile(user_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT user_id, name, age, course, bio, photo_id FROM profiles WHERE user_id=?",
-        (user_id,)
-    )
+    cursor.execute("""
+        SELECT user_id, name, age, gender, looking_for, faculty, specialty, accessibility, course, bio, photo_id, active
+        FROM profiles WHERE user_id=?
+    """, (user_id,))
     result = cursor.fetchone()
     conn.close()
     return result
 
-def get_active_profiles(exclude_user_id):
+
+# Получить активные профили
+def get_active_profiles(exclude_user_id, looking_for=None):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT * FROM profiles WHERE active=1 AND user_id!=?",
-        (exclude_user_id,)
-    )
+
+    if looking_for and looking_for.lower() != "усіх":
+        cursor.execute("""
+            SELECT * FROM profiles 
+            WHERE active=1 AND user_id!=? AND gender=?
+        """, (exclude_user_id, looking_for))
+    else:
+        cursor.execute("""
+            SELECT * FROM profiles 
+            WHERE active=1 AND user_id!=?
+        """, (exclude_user_id,))
+
     result = cursor.fetchall()
     conn.close()
     return result
 
+
+# Лайк 
 def like_profile(user_id, liked_user_id):
-    """Зберігає лайк користувача."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
@@ -75,8 +95,9 @@ def like_profile(user_id, liked_user_id):
     conn.commit()
     conn.close()
 
+
+# Взаимний лайк
 def is_mutual_like(user_id, liked_user_id):
-    """Перевіряє, чи є взаємний лайк."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
@@ -87,8 +108,9 @@ def is_mutual_like(user_id, liked_user_id):
     conn.close()
     return result is not None
 
+
+# Обозначить взаимний лайк
 def set_mutual_like(user_id, liked_user_id):
-    """Позначає пару як взаємну (accepted = 1)."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
@@ -102,6 +124,8 @@ def set_mutual_like(user_id, liked_user_id):
     conn.commit()
     conn.close()
 
+
+# Деактивация
 def disable_profile(user_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -109,6 +133,17 @@ def disable_profile(user_id):
     conn.commit()
     conn.close()
 
+
+# Активация
+def enable_profile(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE profiles SET active=1 WHERE user_id=?", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+# Обновить поле профиля
 def update_profile_field(user_id, field, value):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()

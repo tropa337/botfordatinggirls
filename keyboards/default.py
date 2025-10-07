@@ -19,11 +19,19 @@ def search_menu_kb():
         resize_keyboard=True
     )
 
+def switch_register_kb():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="1"), KeyboardButton(text="2"), KeyboardButton(text="3"),KeyboardButton(text="4"),KeyboardButton(text="5"), KeyboardButton(text="6"), KeyboardButton(text="7")]
+        ],
+        resize_keyboard=True
+    )
+
 # --- Меню сну ---
 def sleep_menu_kb():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="1🚀"), KeyboardButton(text="2"), KeyboardButton(text="3"),KeyboardButton(text="4")]
+            [KeyboardButton(text="1🚀"), KeyboardButton(text="2"), KeyboardButton(text="3"),KeyboardButton(text="4🛠️")]
         ],
         resize_keyboard=True
     )

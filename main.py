@@ -6,7 +6,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import API_TOKEN
 from dataBase import db  # твой файл db.py, где создаются таблицы
-from handlers import menu, profile, registration
+from handlers import menu, registration
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,15 +17,15 @@ logging.basicConfig(
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
-# Создаем таблицы в базе при старте
-db.init_db()  # эта функция должна создавать таблицы, если их нет
+
+db.init_db()  # создаем таблицу
 
 bot = Bot(token=API_TOKEN)
 
 # Подключаем все роутеры
 dp.include_router(registration.router)
 dp.include_router(menu.router)
-dp.include_router(profile.router)
+
 
 async def main():
     logging.info("🤖 Бот запущено...")
