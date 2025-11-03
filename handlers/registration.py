@@ -23,7 +23,7 @@ class Registration(StatesGroup):
     photo = State()
 
 
-#  СТАНИ ДЛЯ РЕДАГУВАННЯ 
+# СТАНИ ДЛЯ РЕДАГУВАННЯ 
 class EditProfile(StatesGroup):
     field = State()
     new_value = State()
@@ -57,7 +57,13 @@ async def reg_age(message: types.Message, state: FSMContext):
     if not message.text.isdigit():
         await message.answer("Будь ласка, введи число 🙂")
         return
-    await state.update_data(age=int(message.text))
+    
+    age = int(message.text)
+    if age < 16 or age > 100:
+        await message.answer("📅 Вік повинен бути від 16 до 100 років")
+        return
+        
+    await state.update_data(age=age)
     await state.set_state(Registration.gender)
 
     kb = ReplyKeyboardBuilder()
@@ -73,53 +79,32 @@ async def reg_gender(message: types.Message, state: FSMContext):
         await message.answer("Оберіть зі списку 👇")
         return
 
-    gender = message.text  # сохраняем как "Чоловік" или "Жінка"
+    gender = message.text
     await state.update_data(gender=gender)
     await state.set_state(Registration.looking_for)
 
     kb = ReplyKeyboardBuilder()
     kb.button(text="Чоловіків")
     kb.button(text="Жінок")
-    kb.button(text="Усі")  # убрали смайлик
+    kb.button(text="Усіх")
     await message.answer("Кого хочеш бачити у пошуку?", reply_markup=kb.as_markup(resize_keyboard=True))
 
 
-#  КОГО ШУКАЄШ  
+# КОГО ШУКАЄШ  
 @router.message(Registration.looking_for)
 async def reg_looking_for(message: types.Message, state: FSMContext):
-    valid = ["Чоловіків", "Жінок", "Усі"]
+    valid = ["Чоловіків", "Жінок", "Усіх"]
     if message.text not in valid:
         await message.answer("Оберіть зі списку 👇")
         return
 
-    # Сохраняем нормализованное значение для поиска
-    if message.text == "Чоловіків":
-        looking_for = "Чоловіків"
-    elif message.text == "Жінок":
-        looking_for = "Жінок"
-    else:
-        looking_for = "Усі"
-
+    looking_for = message.text
     await state.update_data(looking_for=looking_for)
     await state.set_state(Registration.faculty)
     await message.answer("🏫 Вкажи свій факультет:")
 
 
-#  КОГО ШУКАЄШ 
-@router.message(Registration.looking_for)
-async def reg_looking_for(message: types.Message, state: FSMContext):
-    valid = ["Чоловіків", "Жінок", "👥 Усіх"]
-    if message.text not in valid:
-        await message.answer("Оберіть зі списку 👇")
-        return
-
-    looking_for = message.text.replace("👨 ", "").replace("👩 ", "").replace("👥 ", "")
-    await state.update_data(looking_for=looking_for)
-    await state.set_state(Registration.faculty)
-    await message.answer("🏫 Вкажи свій факультет:")
-
-
-#  ФАКУЛЬТЕТ 
+# ФАКУЛЬТЕТ 
 @router.message(Registration.faculty)
 async def reg_faculty(message: types.Message, state: FSMContext):
     await state.update_data(faculty=message.text)
@@ -127,7 +112,7 @@ async def reg_faculty(message: types.Message, state: FSMContext):
     await message.answer("📘 Твоя спеціальність?")
 
 
-#  СПЕЦІАЛЬНІСТЬ 
+# СПЕЦІАЛЬНІСТЬ 
 @router.message(Registration.specialty)
 async def reg_specialty(message: types.Message, state: FSMContext):
     await state.update_data(specialty=message.text)
@@ -141,7 +126,9 @@ async def reg_accessibility(message: types.Message, state: FSMContext):
     if not message.text.isdigit() or not 1 <= int(message.text) <= 10:
         await message.answer("Введи число від 1 до 10 🙂")
         return
-    await state.update_data(accessibility=int(message.text))
+        
+    accessibility = int(message.text)
+    await state.update_data(accessibility=accessibility)
     await state.set_state(Registration.course)
     await message.answer("🎓 На якому ти курсі?")
 
@@ -169,28 +156,34 @@ async def reg_photo(message: types.Message, state: FSMContext):
         await message.answer("Будь ласка, надішли фото 📷")
         return
 
-    data = await state.get_data()
-    photo_id = message.photo[-1].file_id
+    try:
+        data = await state.get_data()
+        photo_id = message.photo[-1].file_id
 
-    add_profile(
-        message.from_user.id,
-        data["name"],
-        data["age"],
-        data["gender"],
-        data["looking_for"],
-        data["faculty"],
-        data["specialty"],
-        data["accessibility"],
-        data["course"],
-        data["bio"],
-        photo_id
-    )
+        # Додаємо профіль в базу
+        add_profile(
+            user_id=message.from_user.id,
+            name=data["name"],
+            age=data["age"],
+            gender=data["gender"],
+            looking_for=data["looking_for"],
+            faculty=data["faculty"],
+            specialty=data["specialty"],
+            accessibility=data["accessibility"],
+            course=data["course"],
+            bio=data["bio"],
+            photo_id=photo_id
+        )
 
-    await state.clear()
-    await message.answer("✅ Анкету створено! Тепер можеш почати пошук 💬", reply_markup=main_menu_kb())
+        await state.clear()
+        await message.answer("✅ Анкету створено! Тепер можеш почати пошук 💬", reply_markup=main_menu_kb())
+        
+    except Exception as e:
+        print(f"❌ Помилка при створенні профілю: {e}")
+        await message.answer("❌ Сталася помилка при створенні анкети. Спробуй ще раз.")
 
-#  РЕДАГУВАННЯ АНКЕТИ 
 
+# РЕДАГУВАННЯ АНКЕТИ 
 @router.message(lambda msg: msg.text == "4🛠️")
 async def edit_profile_start(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
@@ -203,17 +196,19 @@ async def edit_profile_start(message: types.Message, state: FSMContext):
     await state.set_state(EditProfile.field)
     await message.answer(
         "Що хочеш змінити?\n\n"
-        "1️⃣ Ім’я\n"
+        "1️⃣ Ім'я\n"
         "2️⃣ Вік\n"
         "3️⃣ Курс\n"
         "4️⃣ Опис\n"
         "5️⃣ Фото\n"
         "6️⃣ Стать\n"
         "7️⃣ Кого шукаєш\n\n"
-        "Введи номер поля, яке хочеш оновити:",reply_markup=switch_register_kb()
+        "Введи номер поля, яке хочеш оновити:",
+        reply_markup=switch_register_kb()
     )
 
-#  ВИБІР ПОЛЯ  
+
+# ВИБІР ПОЛЯ  
 @router.message(EditProfile.field)
 async def choose_field_to_edit(message: types.Message, state: FSMContext):
     mapping = {
@@ -246,38 +241,49 @@ async def choose_field_to_edit(message: types.Message, state: FSMContext):
         kb = ReplyKeyboardBuilder()
         kb.button(text="Чоловіків")
         kb.button(text="Жінок")
-        kb.button(text="Усі")
+        kb.button(text="Усіх")
         await message.answer("Кого хочеш бачити у пошуку?", reply_markup=kb.as_markup(resize_keyboard=True))
     else:
         await message.answer("✍️ Введи нове значення:")
 
-#  ОНОВЛЕННЯ ДАНИХ 
+
+# ОНОВЛЕННЯ ДАНИХ 
 @router.message(EditProfile.new_value)
 async def update_profile_value(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    field = data["field"]
-    user_id = message.from_user.id
+    try:
+        data = await state.get_data()
+        field = data["field"]
+        user_id = message.from_user.id
 
-    if field == "photo_id":
-        if not message.photo:
-            await message.answer("Будь ласка, надішли фото 📷")
-            return
-        new_value = message.photo[-1].file_id
-    elif field == "gender":
-        if message.text not in ["Чоловік", "Жінка"]:
-            await message.answer("Будь ласка, обери зі списку 👇")
-            return
-        new_value = message.text
-    elif field == "looking_for":
-        if message.text not in ["Чоловіків", "Жінок", "Усі"]:
-            await message.answer("Будь ласка, обери зі списку 👇")
-            return
-        new_value = message.text
-    else:
-        new_value = message.text.strip()
+        if field == "photo_id":
+            if not message.photo:
+                await message.answer("Будь ласка, надішли фото 📷")
+                return
+            new_value = message.photo[-1].file_id
+        elif field == "gender":
+            if message.text not in ["Чоловік", "Жінка"]:
+                await message.answer("Будь ласка, обери зі списку 👇")
+                return
+            new_value = message.text
+        elif field == "looking_for":
+            if message.text not in ["Чоловіків", "Жінок", "Усіх"]:
+                await message.answer("Будь ласка, обери зі списку 👇")
+                return
+            new_value = message.text
+        elif field == "age":
+            if not message.text.isdigit():
+                await message.answer("Будь ласка, введи число 🙂")
+                return
+            new_value = int(message.text)
+        else:
+            new_value = message.text.strip()
 
-    # 🔧 Оновлюємо поле в базі
-    update_profile_field(user_id, field, new_value)
-    await state.clear()
+        # Оновлюємо поле в базі
+        update_profile_field(user_id, field, new_value)
+        await state.clear()
 
-    await message.answer("✅ Дані оновлено!", reply_markup=main_menu_kb())
+        await message.answer("✅ Дані оновлено!", reply_markup=main_menu_kb())
+        
+    except Exception as e:
+        print(f"❌ Помилка при оновленні профілю: {e}")
+        await message.answer("❌ Сталася помилка при оновленні даних. Спробуй ще раз.")

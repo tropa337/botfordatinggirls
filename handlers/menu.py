@@ -1,12 +1,13 @@
 import random
-import sqlite3
 
 from aiogram import Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from dataBase.db import (DB_NAME, disable_profile, enable_profile,
-                         get_active_profiles, get_profile, is_mutual_like,
-                         like_profile, set_mutual_like)
+# Імпорт функцій з твоєї бази даних PostgreSQL
+from dataBase.db import has_liked  # Додамо цю функцію в db.py
+from dataBase.db import (disable_profile, enable_profile, get_active_profiles,
+                         get_profile, is_mutual_like, like_profile,
+                         set_mutual_like)
 from keyboards.default import delete_menu_kb, search_menu_kb, sleep_menu_kb
 
 router = Router()
@@ -23,105 +24,128 @@ def open_tg_profile_kb(username):
 
 # Перевірка, чи вже лайкав користувач 
 def has_liked(user_id, liked_user_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT 1 FROM likes WHERE user_id=? AND liked_user_id=?",
-        (user_id, liked_user_id),
-    )
-    result = cursor.fetchone()
-    conn.close()
-    return result is not None
+    """Функція для перевірки лайків (додай її в db.py)"""
+    from dataBase.db import get_connection
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM likes WHERE user_id = %s AND liked_user_id = %s",
+                (user_id, liked_user_id)
+            )
+            result = cursor.fetchone()
+            return result is not None
+    except Exception as e:
+        print(f"Помилка перевірки лайка: {e}")
+        return False
+    finally:
+        conn.close()
 
 
-#  ПОЧАТОК ПОШУКУ 
+# ПОЧАТОК ПОШУКУ 
 @router.message(lambda msg: msg.text in ["🔍 Почати пошук", "1🚀"])
 async def show_profile(message: types.Message):
-    user_id = message.from_user.id
-    enable_profile(user_id)
-    in_search.add(user_id)
+    try:
+        user_id = message.from_user.id
+        print(f"🟢 Початок пошуку для user_id: {user_id}")
+        
+        enable_profile(user_id)
+        in_search.add(user_id)
 
-    # Отримуємо мій профіль, щоб знати кого шукати
-    my_profile = get_profile(user_id)
-    if not my_profile:
-        await message.answer("⚠️ Спочатку створи свою анкету.")
-        return
+        # Отримуємо мій профіль
+        my_profile = get_profile(user_id)
+        if not my_profile:
+            await message.answer("⚠️ Спочатку створи свою анкету.")
+            return
 
-    (
-        _,
-        my_name,
-        my_age,
-        my_gender,
-        my_looking_for,
-        my_faculty,
-        my_specialty,
-        my_accessibility,
-        my_course,
-        my_bio,
-        my_photo,
-        _,
-    ) = my_profile
+        print(f"🔍 Мій профіль: {my_profile}")
+        
+        # Отримуємо список активних профілів
+        candidates = get_active_profiles(exclude_user_id=user_id)
+        print(f"🔍 Знайдено кандидатів: {len(candidates)}")
+        
+        # Виводимо інформацію про кандидатів для дебагу
+        for i, candidate in enumerate(candidates):
+            print(f"🔍 Кандидат {i+1}: {candidate.get('name')}, {candidate.get('gender')}, ID: {candidate.get('user_id')}")
+        
+        profiles = []
+        my_looking_for = my_profile.get('looking_for', 'Усі')
+        print(f"🔍 Я шукаю: '{my_looking_for}'")
 
-    # Отримуємо список активних профілів, яких ще не лайкав
-    candidates = get_active_profiles(exclude_user_id=user_id)
-    profiles = []
+        for candidate in candidates:
+            candidate_id = candidate['user_id']
+            candidate_gender = candidate.get('gender', '')
+            candidate_name = candidate.get('name', '')
+            
+            print(f"🔍 Перевіряємо кандидата: {candidate_name} ({candidate_gender})")
 
-    for p in candidates:
-        candidate_id, name, age, gender, looking_for, faculty, specialty, accessibility, course, bio, photo_id, active = p
-        if has_liked(user_id, candidate_id):
-            continue  # пропускаємо вже лайкнуті анкети
+            # Перевіряємо чи вже лайкали
+            if has_liked(user_id, candidate_id):
+                print(f"⏩ Пропускаємо вже лайкнутого: {candidate_id}")
+                continue
 
-        # Фільтруємо за бажаною статтю
-        if my_looking_for == "Усі":
-            profiles.append(p)
-        elif my_looking_for == "Чоловіків" and gender == "Чоловік":
-            profiles.append(p)
-        elif my_looking_for == "Жінок" and gender == "Жінка":
-            profiles.append(p)
+            # Фільтруємо за бажаною статтю
+            if my_looking_for.lower() == "усі":
+                profiles.append(candidate)
+                print(f"✅ Додано кандидата {candidate_name} (всі)")
+            elif my_looking_for.lower() == "чоловіків" and candidate_gender.lower() == "чоловік":
+                profiles.append(candidate)
+                print(f"✅ Додано кандидата {candidate_name} (чоловік)")
+            elif my_looking_for.lower() == "жінок" and candidate_gender.lower() == "жінка":
+                profiles.append(candidate)
+                print(f"✅ Додано кандидата {candidate_name} (жінка)")
+            else:
+                print(f"❌ Не підходить по фільтру: {candidate_gender} != {my_looking_for}")
 
-    if not profiles:
-        await message.answer("😕 Немає нових анкет, які відповідають твоїм критеріям.")
-        return
+        print(f"🔍 Після фільтрації залишилось: {len(profiles)}")
 
-    # Випадковий кандидат
-    candidate = random.choice(profiles)
-    (
-        candidate_id,
-        name,
-        age,
-        gender,
-        looking_for,
-        faculty,
-        specialty,
-        accessibility,
-        course,
-        bio,
-        photo_id,
-        active,
-    ) = candidate
+        if not profiles:
+            await message.answer("😕 Немає нових анкет, які відповідають твоїм критеріям.")
+            return
 
-    last_candidates[user_id] = candidate_id
+        # Вибираємо випадкового кандидата
+        candidate = random.choice(profiles)
+        candidate_id = candidate['user_id']
+        last_candidates[user_id] = candidate_id
+        
+        print(f"🎯 Обрано кандидата: {candidate['name']} (ID: {candidate_id})")
+        print(f"📸 Photo ID кандидата: {candidate.get('photo_id')}")
 
-    caption = (
-        f"👤 {name}, {age} років\n"
-        f"🏫 Факультет: {faculty}\n"
-        f"📘 Спеціальність: {specialty}\n"
-        f"📊 Доступність: {accessibility}/10\n"
-        f"🧭 Курс: {course}\n\n"
-        f"{bio}"
-    )
+        # Формуємо опис
+        caption = (
+            f"👤 {candidate['name']}, {candidate['age']} років\n"
+            f"🏫 Факультет: {candidate.get('faculty', 'Не вказано')}\n"
+            f"📘 Спеціальність: {candidate.get('specialty', 'Не вказано')}\n"
+            f"📊 Доступність: {candidate.get('accessibility', 'Не вказано')}/10\n"
+            f"🧭 Курс: {candidate.get('course', 'Не вказано')}\n\n"
+            f"{candidate.get('bio', 'Опис відсутній')}"
+        )
 
-    if not photo_id:
-        await message.answer("❌ Цей користувач не додав фото")
-        return
+        photo_id = candidate.get('photo_id')
+        print(f"🔍 Photo ID для відправки: {photo_id}")
+        
+        if not photo_id:
+            await message.answer("❌ Цей користувач не додав фото")
+            return
 
-    await message.answer_photo(
-        photo=photo_id,
-        caption=caption,
-        reply_markup=search_menu_kb(),
-    )
+        # Спроба відправити фото
+        try:
+            await message.answer_photo(
+                photo=photo_id,
+                caption=caption,
+                reply_markup=search_menu_kb(),
+            )
+            print("✅ Анкету успішно показано")
+        except Exception as e:
+            print(f"❌ Помилка при відправці фото: {e}")
+            await message.answer(f"❌ Помилка при завантаженні анкети: {e}")
 
-#  ЛАЙК 
+    except Exception as e:
+        print(f"❌ Критична помилка в show_profile: {e}")
+        import traceback
+        traceback.print_exc()
+        await message.answer("❌ Сталася помилка при пошуку. Спробуй ще раз.")
+# ЛАЙК 
 @router.message(lambda msg: msg.text == "❤️")
 async def like_handler(message: types.Message):
     user_id = message.from_user.id
@@ -144,35 +168,21 @@ async def like_handler(message: types.Message):
 
     # Перевіряємо, чи це взаємний лайк
     if is_mutual_like(user_id, candidate_id):
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT accepted FROM likes WHERE user_id=? AND liked_user_id=?",
-            (user_id, candidate_id),
-        )
-        accepted = cursor.fetchone()
-        conn.close()
-
-        # Якщо вже є метч — не дублюємо повідомлення
-        if accepted and accepted[0] == 1:
-            await message.answer("💞 Ви вже маєте метч із цим користувачем!")
-            await show_profile(message)
-            return
-
+        # Для PostgreSQL нам не потрібно перевіряти accepted окремо
+        # тому що set_mutual_like вже оновлює обидва записи
+        
         set_mutual_like(user_id, candidate_id)
 
         candidate = get_profile(candidate_id)
         if candidate:
-            _, name, age, gender, looking_for, faculty, specialty, accessibility, course, bio, photo_id, _ = candidate
             candidate_user = await message.bot.get_chat(candidate_id)
 
             if candidate_user.username:
-                username_link = candidate_user.username
-                kb = open_tg_profile_kb(username_link)
+                kb = open_tg_profile_kb(candidate_user.username)
 
                 await message.answer_photo(
-                    photo=photo_id,
-                    caption=f"🎉 У вас взаємний лайк із {name}! 💕\n"
+                    photo=candidate['photo_id'],
+                    caption=f"🎉 У вас взаємний лайк із {candidate['name']}! 💕\n"
                             f"Натисни нижче, щоб перейти у Telegram 👇",
                     reply_markup=kb,
                 )
@@ -186,8 +196,8 @@ async def like_handler(message: types.Message):
                                  f"Натисни нижче, щоб написати 👇",
                             reply_markup=open_tg_profile_kb(user_info.username),
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Помилка відправки повідомлення про метч: {e}")
             else:
                 await message.answer(
                     "🎉 У вас взаємний лайк, але користувач не має @username 😔",
@@ -198,7 +208,7 @@ async def like_handler(message: types.Message):
         await show_profile(message)
 
 
-#  ДИЗЛАЙК 
+# ДИЗЛАЙК 
 @router.message(lambda msg: msg.text == "❌")
 async def dislike_handler(message: types.Message):
     user_id = message.from_user.id
@@ -211,7 +221,7 @@ async def dislike_handler(message: types.Message):
     await show_profile(message)
 
 
-#  МЕНЮ СНУ 
+# МЕНЮ СНУ 
 @router.message(lambda msg: msg.text == "😴")
 async def sleep_menu_handler(message: types.Message):
     user_id = message.from_user.id
@@ -227,7 +237,8 @@ async def sleep_menu_handler(message: types.Message):
         reply_markup=sleep_menu_kb(),
     )
 
-#  ОБРОБКА ВИБОРУ ПОЧАТКУ ЧАТУ  
+
+# ОБРОБКА ВИБОРУ ПОЧАТКУ ЧАТУ  
 @router.callback_query(lambda c: c.data.startswith("chat:"))
 async def start_chat(callback: types.CallbackQuery):
     target_id = int(callback.data.split(":")[1])
@@ -237,14 +248,14 @@ async def start_chat(callback: types.CallbackQuery):
         await callback.message.answer("⚠️ Користувач недоступний.")
         return
 
-    _, name, age, course, bio, photo_id = target_profile
     await callback.message.answer_photo(
-        photo=photo_id,
-        caption=f"💬 Ти почав(-ла) спілкування з {name}!"
+        photo=target_profile['photo_id'],
+        caption=f"💬 Ти почав(-ла) спілкування з {target_profile['name']}!"
     )
     await callback.answer("Чат відкрито!")
 
-#  МОЯ АНКЕТА 
+
+# МОЯ АНКЕТА 
 @router.message(lambda msg: msg.text == "2")
 async def my_profile(message: types.Message):
     user = get_profile(message.from_user.id)
@@ -252,41 +263,28 @@ async def my_profile(message: types.Message):
         await message.answer("😕 Ти ще не зареєстрований. Напиши /start")
         return
 
-    (
-        user_id,
-        name,
-        age,
-        gender,
-        looking_for,
-        faculty,
-        specialty,
-        accessibility,
-        course,
-        bio,
-        photo_id,
-        active
-    ) = user
-
     caption = (
-        f"👤 {name}, {age} років\n"
-        f"🧍 Стать: {gender}\n"
-        f"🏫 Факультет: {faculty}\n"
-        f"📘 Спеціальність: {specialty}\n"
-        f"📊 Доступність: {accessibility}/10\n"
-        f"🧭 Курс: {course}\n\n"
-        f"{bio}"
+        f"👤 {user['name']}, {user['age']} років\n"
+        f"🧍 Стать: {user['gender']}\n"
+        f"🏫 Факультет: {user['faculty']}\n"
+        f"📘 Спеціальність: {user['specialty']}\n"
+        f"📊 Доступність: {user['accessibility']}/10\n"
+        f"🧭 Курс: {user['course']}\n\n"
+        f"{user['bio']}"
     )
 
     await message.answer_photo(
-        photo=photo_id,
+        photo=user['photo_id'],
         caption=caption,
         reply_markup=sleep_menu_kb()
     )
 
-#  ВИДАЛЕННЯ / ВИМКНЕННЯ АНКЕТИ 
+
+# ВИДАЛЕННЯ / ВИМКНЕННЯ АНКЕТИ 
 @router.message(lambda msg: msg.text == "3")
 async def delete_profile_menu(message: types.Message):
     await message.answer("⚠️ Хочеш вимкнути анкету?", reply_markup=delete_menu_kb())
+
 
 @router.message(lambda msg: msg.text == "🚫 Вимкнути анкету")
 async def disable_profile_handler(message: types.Message):
@@ -296,8 +294,8 @@ async def disable_profile_handler(message: types.Message):
         reply_markup=sleep_menu_kb()
     )
 
-#  ПОВЕРНЕННЯ НАЗАД 
+
+# ПОВЕРНЕННЯ НАЗАД 
 @router.message(lambda msg: msg.text == "Назад")
 async def back(message: types.Message):
     await message.answer("🔙 Повернувся в меню", reply_markup=sleep_menu_kb())
-
