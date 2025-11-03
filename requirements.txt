@@ -1,3 +1,4 @@
 asyncio
 logging
 aiogram
+psycopg2
