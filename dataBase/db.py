@@ -6,10 +6,10 @@ from psycopg2.extras import RealDictCursor
 
 # Налаштування підключення до БД
 DB_CONFIG = {
-    "dbname": "postgres",           # Змінив на bot_db
-    "user": "postgres",           
-    "password": "0803trop",          
-    "host": "localhost",
+    "dbname": "dv_knu",           # Змінив на bot_db
+    "user": "dv_knu_user",           
+    "password": "e96gkA539jHZiaIKKPXmDJJ5CIJ3j6pp",          
+    "host": "dpg-d44fnsripnbc73frua00-a",
     "port": "5432"
 }
 
