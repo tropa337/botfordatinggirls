@@ -5,7 +5,7 @@ from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 def main_menu_kb():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🔍 Почати пошук")]
+            [KeyboardButton(text="🔍 Почати пошук"),KeyboardButton(text="😴Меню")]
         ],
         resize_keyboard=True
     )
@@ -14,7 +14,7 @@ def main_menu_kb():
 def search_menu_kb():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="❤️"), KeyboardButton(text="❌"), KeyboardButton(text="😴")]
+            [KeyboardButton(text="❤️"), KeyboardButton(text="❌"), KeyboardButton(text="😴Меню")]
         ],
         resize_keyboard=True
     )
@@ -22,9 +22,10 @@ def search_menu_kb():
 def switch_register_kb():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="1"), KeyboardButton(text="2"), KeyboardButton(text="3"),KeyboardButton(text="4"),KeyboardButton(text="5"), KeyboardButton(text="6"), KeyboardButton(text="7")]
+            [KeyboardButton(text="1"), KeyboardButton(text="2"), KeyboardButton(text="3"),KeyboardButton(text="4"),KeyboardButton(text="5"), KeyboardButton(text="6"), KeyboardButton(text="7"),KeyboardButton(text="8"), KeyboardButton(text="😴Меню")]
         ],
-        resize_keyboard=True
+        resize_keyboard=True, reply_markup=None
+        
     )
 
 # --- Меню сну ---

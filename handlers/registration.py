@@ -2,10 +2,11 @@ from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 from dataBase.db import add_profile, get_profile, update_profile_field
-from keyboards.default import main_menu_kb, switch_register_kb
+from keyboards.default import main_menu_kb, sleep_menu_kb, switch_register_kb
 
 router = Router()
 
@@ -15,9 +16,9 @@ class Registration(StatesGroup):
     age = State()
     gender = State()
     looking_for = State()
+    goal = State()
     faculty = State()
     specialty = State()
-    accessibility = State()
     course = State()
     bio = State()
     photo = State()
@@ -39,8 +40,23 @@ async def start_cmd(message: types.Message, state: FSMContext):
         await message.answer("👋 Ти вже зареєстрований!", reply_markup=main_menu_kb())
         return
 
+    # Привітальне повідомлення + кнопка “Продовжити”
+    kb = ReplyKeyboardBuilder()
+    kb.button(text="▶️ Продовжити")
+    await message.answer(
+        "🌸 Вітаю у нашому боті знайомств!\n\n"
+        "Тут ти зможеш створити свій профіль, переглядати інших користувачів і спілкуватися 💬\n\n"
+        "Натисни «▶️ Продовжити», щоб почати реєстрацію.",
+        reply_markup=kb.as_markup(resize_keyboard=True)
+    )
+
+
+# ——— Обробник натискання “Продовжити” ———
+@router.message(lambda msg: msg.text == "▶️ Продовжити")
+async def start_registration(message: types.Message, state: FSMContext):
     await state.set_state(Registration.name)
-    await message.answer("👋 Привіт! Як тебе звати?")
+    # Прибираємо клавіатуру, щоб залишилось лише поле для вводу
+    await message.answer("👋 Привіт! Як тебе звати?", reply_markup=ReplyKeyboardRemove())
 
 
 # ІМ'Я 
@@ -101,8 +117,25 @@ async def reg_looking_for(message: types.Message, state: FSMContext):
     looking_for = message.text
     await state.update_data(looking_for=looking_for)
     await state.set_state(Registration.faculty)
-    await message.answer("🏫 Вкажи свій факультет:")
+    await message.answer("Що шукаєш:", reply_markup=ReplyKeyboardRemove())
 
+# Цель
+@router.message(Registration.goal)
+async def reg_goal(message: types.Message, state: FSMContext):
+    if message.text not in ["Дружба", "Відносини", "Спілкування", "Знайомства"]:
+        await message.answer("Оберіть зі списку 👇")
+        return
+
+    goal = message.text
+    await state.update_data(goal=goal)
+    await state.set_state(Registration.goal)
+
+    kb = ReplyKeyboardBuilder()
+    kb.button(text="Дружба")
+    kb.button(text="Відносини")
+    kb.button(text="Спілкування")
+    kb.button(text="Знайомства")
+    await message.answer("🏫 Вкажи свій факультет:", reply_markup=kb.as_markup(resize_keyboard=True))
 
 # ФАКУЛЬТЕТ 
 @router.message(Registration.faculty)
@@ -116,21 +149,21 @@ async def reg_faculty(message: types.Message, state: FSMContext):
 @router.message(Registration.specialty)
 async def reg_specialty(message: types.Message, state: FSMContext):
     await state.update_data(specialty=message.text)
-    await state.set_state(Registration.accessibility)
-    await message.answer("🔥 Наскільки ти легкодоступний (1 – закритий, 10 – дуже відкритий)?")
+    await state.set_state(Registration.course)
+    await message.answer("🎓 На якому ти курсі?")
 
 
 # ЛЕГКОДОСТУПНІСТЬ 
-@router.message(Registration.accessibility)
-async def reg_accessibility(message: types.Message, state: FSMContext):
-    if not message.text.isdigit() or not 1 <= int(message.text) <= 10:
-        await message.answer("Введи число від 1 до 10 🙂")
-        return
+# @router.message(Registration.accessibility)
+# async def reg_accessibility(message: types.Message, state: FSMContext):
+#     if not message.text.isdigit() or not 1 <= int(message.text) <= 10:
+#         await message.answer("Введи число від 1 до 10 🙂")
+#         return
         
-    accessibility = int(message.text)
-    await state.update_data(accessibility=accessibility)
-    await state.set_state(Registration.course)
-    await message.answer("🎓 На якому ти курсі?")
+#     accessibility = int(message.text)
+#     await state.update_data(accessibility=accessibility)
+    # await state.set_state(Registration.course)
+    # await message.answer("🎓 На якому ти курсі?")
 
 
 # КУРС 
@@ -167,9 +200,9 @@ async def reg_photo(message: types.Message, state: FSMContext):
             age=data["age"],
             gender=data["gender"],
             looking_for=data["looking_for"],
+            goal=data["goal"],
             faculty=data["faculty"],
             specialty=data["specialty"],
-            accessibility=data["accessibility"],
             course=data["course"],
             bio=data["bio"],
             photo_id=photo_id
@@ -202,8 +235,11 @@ async def edit_profile_start(message: types.Message, state: FSMContext):
         "4️⃣ Опис\n"
         "5️⃣ Фото\n"
         "6️⃣ Стать\n"
-        "7️⃣ Кого шукаєш\n\n"
-        "Введи номер поля, яке хочеш оновити:",
+        "7️⃣ Кого шукаєш\n"
+        "8️⃣ Ціль перебування\n\n"
+
+        "Введи номер поля, яке хочеш оновити:\n"
+        "Зворотний зв'язок: @fieldceo",
         reply_markup=switch_register_kb()
     )
 
@@ -218,12 +254,14 @@ async def choose_field_to_edit(message: types.Message, state: FSMContext):
         "4": "bio",
         "5": "photo_id",
         "6": "gender",
-        "7": "looking_for"
+        "7": "looking_for",
+        "8": "goal",
+        "😴Меню": "main_menu"
     }
 
     choice = message.text.strip()
     if choice not in mapping:
-        await message.answer("Будь ласка, введи число від 1 до 7 🙂")
+        await message.answer("Будь ласка, введи число від 1 до 8 🙂")
         return
 
     field = mapping[choice]
@@ -232,6 +270,9 @@ async def choose_field_to_edit(message: types.Message, state: FSMContext):
 
     if field == "photo_id":
         await message.answer("📸 Надішли нове фото:")
+    elif field == "main_menu":
+        await message.answer("🔙 Повертаємось у меню.", reply_markup=sleep_menu_kb())
+        await state.clear()
     elif field == "gender":
         kb = ReplyKeyboardBuilder()
         kb.button(text="Чоловік")
@@ -243,8 +284,15 @@ async def choose_field_to_edit(message: types.Message, state: FSMContext):
         kb.button(text="Жінок")
         kb.button(text="Усіх")
         await message.answer("Кого хочеш бачити у пошуку?", reply_markup=kb.as_markup(resize_keyboard=True))
+    elif field == "goal":
+        kb = ReplyKeyboardBuilder()
+        kb.button(text="Дружба")
+        kb.button(text="Відносини")
+        kb.button(text="Спілкування")
+        kb.button(text="Знайомства")
+        await message.answer("Що шукаєш?", reply_markup=kb.as_markup(resize_keyboard=True))
     else:
-        await message.answer("✍️ Введи нове значення:")
+        await message.answer("✍️ Введи нове значення:", reply_markup=ReplyKeyboardRemove())
 
 
 # ОНОВЛЕННЯ ДАНИХ 

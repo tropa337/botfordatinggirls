@@ -116,7 +116,7 @@ async def show_profile(message: types.Message):
             f"👤 {candidate['name']}, {candidate['age']} років\n"
             f"🏫 Факультет: {candidate.get('faculty', 'Не вказано')}\n"
             f"📘 Спеціальність: {candidate.get('specialty', 'Не вказано')}\n"
-            f"📊 Доступність: {candidate.get('accessibility', 'Не вказано')}/10\n"
+            f"📊 Ціль: {candidate.get('goal', 'Не вказано')}\n"
             f"🧭 Курс: {candidate.get('course', 'Не вказано')}\n\n"
             f"{candidate.get('bio', 'Опис відсутній')}"
         )
@@ -222,7 +222,7 @@ async def dislike_handler(message: types.Message):
 
 
 # МЕНЮ СНУ 
-@router.message(lambda msg: msg.text == "😴")
+@router.message(lambda msg: msg.text == "😴Меню")
 async def sleep_menu_handler(message: types.Message):
     user_id = message.from_user.id
     if user_id in in_search:
@@ -268,7 +268,8 @@ async def my_profile(message: types.Message):
         f"🧍 Стать: {user['gender']}\n"
         f"🏫 Факультет: {user['faculty']}\n"
         f"📘 Спеціальність: {user['specialty']}\n"
-        f"📊 Доступність: {user['accessibility']}/10\n"
+        # f"📊 Ціль: {user['goal']}\n"
+        # f"📊 Доступність: {user['accessibility']}/10\n"
         f"🧭 Курс: {user['course']}\n\n"
         f"{user['bio']}"
     )

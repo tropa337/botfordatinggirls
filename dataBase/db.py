@@ -5,13 +5,15 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 # Налаштування підключення до БД
+
 DB_CONFIG = {
-    "dbname": "dv_knu",           # Змінив на bot_db
-    "user": "dv_knu_user",           
-    "password": "e96gkA539jHZiaIKKPXmDJJ5CIJ3j6pp",          
-    "host": "dpg-d44fnsripnbc73frua00-a",
+    "dbname": "postgres",           # Змінив на bot_db
+    "user": "postgres",           
+    "password": "0803trop",          
+    "host": "localhost",
     "port": "5432"
 }
+
 
 class DatabaseError(Exception):
     """Власний виняток для помилок БД"""
@@ -38,9 +40,9 @@ def init_db():
                     age INTEGER CHECK (age >= 16 AND age <= 100),
                     gender VARCHAR(20) NOT NULL,
                     looking_for VARCHAR(20) NOT NULL,
+                    goal VARCHAR(20) NOT NULL,
                     faculty VARCHAR(100),
                     specialty VARCHAR(100),
-                    accessibility INTEGER CHECK (accessibility >= 0 AND accessibility <= 10),
                     course VARCHAR(50),
                     bio TEXT,
                     photo_id VARCHAR(255),
@@ -69,8 +71,8 @@ def init_db():
     finally:
         conn.close()
 
-def add_profile(user_id: int, name: str, age: int, gender: str, looking_for: str, 
-                faculty: str, specialty: str, accessibility: int, course: str, 
+def add_profile(user_id: int, name: str, age: int, gender: str, looking_for: str, goal: str, 
+                faculty: str, specialty: str, course: str, 
                 bio: str, photo_id: str) -> bool:
     """Додавання або оновлення профілю"""
     conn = get_connection()
@@ -78,8 +80,7 @@ def add_profile(user_id: int, name: str, age: int, gender: str, looking_for: str
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO profiles 
-                (user_id, name, age, gender, looking_for, faculty, specialty, 
-                 accessibility, course, bio, photo_id, active)
+                (user_id, name, age, gender, looking_for, goal, faculty, specialty, course, bio, photo_id, active)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
                 ON CONFLICT (user_id) 
                 DO UPDATE SET 
@@ -87,16 +88,15 @@ def add_profile(user_id: int, name: str, age: int, gender: str, looking_for: str
                     age = EXCLUDED.age,
                     gender = EXCLUDED.gender,
                     looking_for = EXCLUDED.looking_for,
+                    goal = EXCLUDED.goal,
                     faculty = EXCLUDED.faculty,
                     specialty = EXCLUDED.specialty,
-                    accessibility = EXCLUDED.accessibility,
                     course = EXCLUDED.course,
                     bio = EXCLUDED.bio,
                     photo_id = EXCLUDED.photo_id,
                     active = TRUE,
                     updated_at = CURRENT_TIMESTAMP
-            """, (user_id, name, age, gender, looking_for, faculty, specialty, 
-                  accessibility, course, bio, photo_id))
+            """, (user_id, name, age, gender, looking_for, goal, faculty, specialty, course, bio, photo_id))
         conn.commit()
         return True
     except psycopg2.Error as e:
@@ -208,8 +208,8 @@ def enable_profile(user_id: int) -> bool:
 def update_profile_field(user_id: int, field: str, value: Any) -> bool:
     """Безпечне оновлення поля профілю"""
     allowed_fields = {
-        'name', 'age', 'gender', 'looking_for', 'faculty', 
-        'specialty', 'accessibility', 'course', 'bio', 'photo_id', 'active'
+        'name', 'age', 'gender', 'looking_for', 'faculty', 'goal',
+        'specialty',  'course', 'bio', 'photo_id', 'active'
     }
     
     if field not in allowed_fields:
