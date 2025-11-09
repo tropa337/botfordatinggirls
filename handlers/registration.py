@@ -44,10 +44,12 @@ async def start_cmd(message: types.Message, state: FSMContext):
     kb = ReplyKeyboardBuilder()
     kb.button(text="▶️ Продовжити")
     await message.answer(
-        "🌸 Вітаю у нашому боті знайомств!\n\n"
-        "Тут ти зможеш створити свій профіль, переглядати інших користувачів і спілкуватися 💬\n\n"
-        "Натисни «▶️ Продовжити», щоб почати реєстрацію.",
-        reply_markup=kb.as_markup(resize_keyboard=True)
+        "👋 Ласкаво просимо!\n\n"
+        "Ми — [field], команда, що створює корисні інструменти (цей бот!🗽).\n\n"
+        "Якщо ви теж захоплюєтесь технологіями, підписуйтесь — у нас багато планів, і ми шукаємо однодумців в нашу невелику команду.\n\n"
+        "Дізнавайтеся першими про наші оновлення та майбутні проєкти.\n\n"
+        "Чекаємо у каналі (https://t.me/+bhKDN_t46cU1NDgy)\n\n",
+    reply_markup=kb.as_markup(resize_keyboard=True)
     )
 
 
